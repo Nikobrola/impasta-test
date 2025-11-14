@@ -162,7 +162,7 @@
 /* Performance optimizations for mobile devices */
 /* Reduce expensive backdrop-blur effects on mobile to prevent freezing */
 @media (max-width: 768px) {
-  /* Disable backdrop blur on mobile - very expensive operation */
+  /* Disable backdrop blur on mobile - very expensive operation that causes freezing */
   .backdrop-blur-sm,
   .backdrop-blur-md,
   .backdrop-blur-lg {
@@ -170,15 +170,17 @@
     -webkit-backdrop-filter: none !important;
   }
   
-  /* Reduce transform animations on mobile */
-  * {
+  /* Reduce expensive transform animations on mobile (keep essential ones) */
+  button:hover,
+  .hover\:scale-105:hover,
+  .hover\:scale-110:hover {
     transform: none !important;
-    transition: opacity 0.2s ease, background-color 0.2s ease !important;
   }
   
-  /* Disable hover effects on mobile */
-  *:hover {
-    transform: none !important;
+  /* Simplify transitions on mobile */
+  button,
+  .transition-all {
+    transition: opacity 0.2s ease, background-color 0.2s ease, border-color 0.2s ease !important;
   }
 }
 
