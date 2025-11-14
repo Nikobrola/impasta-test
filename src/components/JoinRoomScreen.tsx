@@ -11,6 +11,7 @@ interface JoinRoomScreenProps {
 
 export default function JoinRoomScreen({ onJoinRoom, onBack, language, error }: JoinRoomScreenProps) {
   const [roomCode, setRoomCode] = useState('');
+  const [isJoining, setIsJoining] = useState(false);
 
   const texts = {
     en: {
@@ -44,10 +45,16 @@ export default function JoinRoomScreen({ onJoinRoom, onBack, language, error }: 
 
   const t = texts[language];
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (roomCode.length === 6) {
-      onJoinRoom(roomCode);
+    if (roomCode.length === 6 && !isJoining) {
+      setIsJoining(true);
+      try {
+        await onJoinRoom(roomCode);
+      } catch (err) {
+        console.error('Error joining room:', err);
+        setIsJoining(false);
+      }
     }
   };
 
@@ -86,7 +93,7 @@ export default function JoinRoomScreen({ onJoinRoom, onBack, language, error }: 
 
         {/* Join Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="backdrop-blur-sm rounded-3xl p-6 mb-8 border shadow-2xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
+          <div className="rounded-3xl p-6 mb-8 border shadow-2xl" style={{ backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: 'rgba(59, 130, 246, 0.3)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
             <div className="text-center mb-6">
               <h2 className="text-xl font-semibold text-white">{t.codeLabel}</h2>
             </div>
@@ -104,7 +111,7 @@ export default function JoinRoomScreen({ onJoinRoom, onBack, language, error }: 
 
               {/* Error Message */}
               {error && (
-                <div className="backdrop-blur-sm rounded-xl p-4 border" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                <div className="rounded-xl p-4 border" style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: 'rgba(239, 68, 68, 0.3)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
                   <p className="text-red-400 text-sm text-center font-medium">
                     {error === 'roomNotFound' && t.roomNotFound}
                     {error === 'invalidCode' && t.invalidCode}
@@ -118,21 +125,28 @@ export default function JoinRoomScreen({ onJoinRoom, onBack, language, error }: 
           {/* Join Button */}
           <button
             type="submit"
-            disabled={roomCode.length !== 6}
-            className="w-full py-4 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-semibold text-lg text-white"
+            disabled={roomCode.length !== 6 || isJoining}
+            className="w-full py-4 rounded-2xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 font-semibold text-lg text-white relative"
             style={{ 
               backgroundColor: '#3B82F6',
-              boxShadow: roomCode.length === 6 ? '0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.2), 0 10px 25px rgba(0, 0, 0, 0.3)' : '0 10px 25px rgba(0, 0, 0, 0.3)',
+              boxShadow: roomCode.length === 6 && !isJoining ? '0 0 20px rgba(59, 130, 246, 0.4), 0 0 40px rgba(59, 130, 246, 0.2), 0 10px 25px rgba(0, 0, 0, 0.3)' : '0 10px 25px rgba(0, 0, 0, 0.3)',
               border: '1px solid rgba(59, 130, 246, 0.8)'
             }}
           >
-            {t.join}
+            {isJoining ? (
+              <span className="flex items-center justify-center">
+                <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></span>
+                Joining...
+              </span>
+            ) : (
+              t.join
+            )}
           </button>
 
           {/* Back Button */}
           <button
             onClick={onBack}
-            className="w-full py-4 bg-gradient-to-br from-gray-600/80 to-gray-700/80 backdrop-blur-sm text-white font-medium rounded-2xl hover:from-gray-500/80 hover:to-gray-600/80 transition-all duration-300 border border-gray-500/70"
+            className="w-full py-4 bg-gradient-to-br from-gray-600/80 to-gray-700/80 text-white font-medium rounded-2xl hover:from-gray-500/80 hover:to-gray-600/80 transition-all duration-300 border border-gray-500/70"
           >
             {t.back}
           </button>

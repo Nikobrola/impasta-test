@@ -36,6 +36,10 @@ export function useSupabaseRoom({ roomId, onGameStateUpdate, onPlayersUpdate, on
   useEffect(() => {
     if (!roomId || !isInitialized) return;
 
+    // OPTIMIZED: Cache game state to avoid fetching on every player update (expensive on mobile)
+    // Use a ref to persist across re-renders but reset when roomId changes
+    let cachedGameState: GameState | undefined = undefined;
+
     // Subscribe to room changes
     const roomSubscription = roomService.subscribeToRoom(roomId, (room) => {
       // Handle room updates if needed
@@ -43,13 +47,13 @@ export function useSupabaseRoom({ roomId, onGameStateUpdate, onPlayersUpdate, on
     });
 
     // Subscribe to room players changes
-    const playersSubscription = roomService.subscribeToRoomPlayers(roomId, async (roomPlayers) => {
+    // OPTIMIZED: Use cached game state instead of fetching every time
+    // This significantly improves performance on mobile devices
+    const playersSubscription = roomService.subscribeToRoomPlayers(roomId, (roomPlayers) => {
       if (onPlayersUpdate) {
-        // Get current game state to preserve player roles
-        const gameStateData = await roomService.getGameState(roomId);
-        const currentGameState = gameStateData?.state as GameState | undefined;
-        
-        const players = roomPlayers.map(rp => roomPlayerToPlayer(rp, currentGameState));
+        // Use cached game state instead of fetching every time
+        // This significantly improves performance on mobile
+        const players = roomPlayers.map(rp => roomPlayerToPlayer(rp, cachedGameState));
         onPlayersUpdate(players);
       }
     });
@@ -58,6 +62,10 @@ export function useSupabaseRoom({ roomId, onGameStateUpdate, onPlayersUpdate, on
     const gameStateSubscription = roomService.subscribeToGameState(roomId, (gameStateData) => {
       if (onGameStateUpdate) {
         const gameState = gameStateData.state as GameState;
+        
+        // Cache game state for use in player updates (performance optimization)
+        cachedGameState = gameState;
+        
         onGameStateUpdate(gameState);
         
         // Sync screen from game state
@@ -65,6 +73,15 @@ export function useSupabaseRoom({ roomId, onGameStateUpdate, onPlayersUpdate, on
           onScreenUpdate(gameState.currentScreen);
         }
       }
+    });
+    
+    // Initial fetch of game state to populate cache
+    roomService.getGameState(roomId).then((gameStateData) => {
+      if (gameStateData?.state) {
+        cachedGameState = gameStateData.state as GameState;
+      }
+    }).catch((error) => {
+      console.warn('Could not fetch initial game state for cache:', error);
     });
 
     subscriptionsRef.current = [

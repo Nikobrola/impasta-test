@@ -597,55 +597,68 @@ function App() {
   const handleJoinRoomSubmit = async (roomCode: string) => {
     if (!currentUserId) {
       console.error('User not authenticated');
-          return;
-    }
-
-    // Get room by code
-    const room = await roomService.getRoomByCode(roomCode);
-    
-    if (!room) {
-      console.error('Room not found');
-      // TODO: Show error message to user
       return;
     }
 
-    if (!room.is_active) {
-      console.error('Room is not active');
-      // TODO: Show error message to user
-      return;
-    }
-
-    setRoomId(room.id);
-
-    // Add player to room (or update if already exists)
-    // UPSERT handles re-joins gracefully - if player already exists, it updates their status
-    const roomPlayer = await roomService.addPlayerToRoom(
-      room.id,
-      currentUserId,
-      username,
-      avatar || null,
-      false,
-      false
-    );
-
-    if (!roomPlayer) {
-      console.error('Failed to join room - player may already be in room or database error occurred');
-      // Try to get existing players to see if we're already in the room
-      const existingPlayers = await roomService.getRoomPlayers(room.id);
-      const alreadyInRoom = existingPlayers.some(p => p.player_id === currentUserId);
+    try {
+      // Get room by code with timeout
+      const room = await Promise.race([
+        roomService.getRoomByCode(roomCode),
+        new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error('Room lookup timeout')), 10000)
+        )
+      ]) as Awaited<ReturnType<typeof roomService.getRoomByCode>>;
       
-      if (alreadyInRoom) {
-        console.log('Player already in room, continuing with existing data...');
-        // Continue with existing room data instead of failing
-      } else {
-        // Real error - can't join
-      return;
+      if (!room) {
+        console.error('Room not found');
+        // TODO: Show error message to user
+        return;
       }
-    }
 
-    // Get existing players and game state
-    const roomPlayers = await roomService.getRoomPlayers(room.id);
-    const gameStateData = await roomService.getGameState(room.id);
+      if (!room.is_active) {
+        console.error('Room is not active');
+        // TODO: Show error message to user
+        return;
+      }
+
+      setRoomId(room.id);
+
+      // Add player to room (or update if already exists)
+      // UPSERT handles re-joins gracefully - if player already exists, it updates their status
+      const roomPlayer = await Promise.race([
+        roomService.addPlayerToRoom(
+          room.id,
+          currentUserId,
+          username,
+          avatar || null,
+          false,
+          false
+        ),
+        new Promise<null>((_, reject) => 
+          setTimeout(() => reject(new Error('Add player timeout')), 10000)
+        )
+      ]) as Awaited<ReturnType<typeof roomService.addPlayerToRoom>>;
+
+      if (!roomPlayer) {
+        console.error('Failed to join room - player may already be in room or database error occurred');
+        // Try to get existing players to see if we're already in the room
+        const existingPlayers = await roomService.getRoomPlayers(room.id);
+        const alreadyInRoom = existingPlayers.some(p => p.player_id === currentUserId);
+        
+        if (alreadyInRoom) {
+          console.log('Player already in room, continuing with existing data...');
+          // Continue with existing room data instead of failing
+        } else {
+          // Real error - can't join
+          return;
+        }
+      }
+
+      // Get existing players and game state in parallel for better performance
+      const [roomPlayers, gameStateData] = await Promise.all([
+        roomService.getRoomPlayers(room.id),
+        roomService.getGameState(room.id)
+      ]);
 
     // Convert room data to game state
     const existingGameState = gameStateData?.state as GameState | undefined;
@@ -681,6 +694,11 @@ function App() {
     // Sync screen from game state if available, otherwise default to lobby
     const screenToShow = mergedGameState.currentScreen || 'lobby';
     setCurrentScreen(screenToShow as Screen);
+    } catch (error) {
+      console.error('Error joining room:', error);
+      // Reset loading state will be handled by JoinRoomScreen
+      throw error; // Re-throw so JoinRoomScreen can handle it
+    }
   };
 
   const handleAddBot = async () => {

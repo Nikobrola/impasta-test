@@ -159,6 +159,29 @@
   }
 }
 
+/* Performance optimizations for mobile devices */
+/* Reduce expensive backdrop-blur effects on mobile to prevent freezing */
+@media (max-width: 768px) {
+  /* Disable backdrop blur on mobile - very expensive operation */
+  .backdrop-blur-sm,
+  .backdrop-blur-md,
+  .backdrop-blur-lg {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  
+  /* Reduce transform animations on mobile */
+  * {
+    transform: none !important;
+    transition: opacity 0.2s ease, background-color 0.2s ease !important;
+  }
+  
+  /* Disable hover effects on mobile */
+  *:hover {
+    transform: none !important;
+  }
+}
+
 /* Custom scrollbar for mobile */
 @layer utilities {
   .scrollbar-hide {
